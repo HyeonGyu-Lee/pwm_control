@@ -2,4 +2,7 @@
 xavier_to_opencr
 
 # geometry_msgs
-git https://github.com/ros/common_msgs.git
+git clone https://github.com/ros/common_msgs.git
+
+# usb_cam
+git clone https://github.com/ros-drivers/usb_cam.git 
