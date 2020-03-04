@@ -73,22 +73,23 @@ public:
 		/********** PID control ***********/
 		center_position_ = 640;
 		move_ = (Mat_<float>(2, 3) << 1, 0, 0, 0, 1, 3);// x y
-		Kp_ = 10;
+		Kp_ = 20;
 		Ki_ = 0.0025f;
-		Kd_ = 0.0001f;
+		Kd_ = 0.001f;
 		dt_ = 0.001f;
 		prev_err_ = 0;
-		
+		steer_ = 1500;
+		accel_ = 1500;
 
 		/********** pub config **********/
 		cout << "[pub config]" << endl;
 	        pub_ = nh_.advertise<geometry_msgs::Twist>("twist_msg",1000);
-	        msg_.linear.x = 1400;
-		msg_.angular.z = 1400;
+	        msg_.linear.x = steer_;
+		msg_.angular.z = accel_;
 
 		/********** image config **********/
 		cout << "[image config]" << endl;
-		select_ = 0;
+		select_ = 2;
 		switch (select_) {
 		case 0:
 			image_sub_ = nh_.subscribe("/usb_cam/image_raw", 10, &LaneDetector::ImageCallback, this);
@@ -695,7 +696,7 @@ public:
 
 		if (!l_fit.empty() && !r_fit.empty()) {
 			lane_center_position = (l_fit.at<float>(0, 0) + r_fit.at<float>(0, 0)) / 2;
-			if ((lane_center_position >= 0.0) && (lane_center_position < (float)_width)) {
+			if ((lane_center_position > 0) && (lane_center_position < (float)_width)) {
 				center_position = (car_position - lane_center_position) * ym_per_pix;
 				//center_position_ = center_position;
 				err_ = (float)(lane_center_position - center_position_);
@@ -716,17 +717,18 @@ public:
 				prev_pid_ = tmp;
 				warpAffine(pid_graph_, pid_graph_, move_, pid_graph_.size());
 
-				steer_ = (int)((center_position_ / (float)_width * 800.0) + 1200.0);// 1200~1800
+				steer_ = (int)((center_position_ / (float)_width * 900.0) + 1200.0);// 1200~1800
 				if(steer_ < 1200)
 					steer_ = 1200;
 				if(steer_ > 1800)
 					steer_ = 1800;
-				accel_ = (int)(1750);
+				accel_ = (int)(1600);
 				printf("%5d %5d\n", steer_, accel_);
 				msg_.angular.z = (int)steer_;
 				msg_.linear.x = (int)accel_;
 			}
-			else {
+		}
+			/*else {
 				line(pid_graph_, Point(prev_lane_, 1), Point(prev_lane_, 3), Scalar(0, 255, 0), 2);
 				line(pid_graph_, Point(prev_pid_, 1), Point(prev_pid_, 3), Scalar(0, 0, 255), 2);
 				warpAffine(pid_graph_, pid_graph_, move_, pid_graph_.size());
@@ -736,7 +738,7 @@ public:
 			line(pid_graph_, Point(prev_lane_, 1), Point(prev_lane_, 3), Scalar(0, 255, 0), 2);
 			line(pid_graph_, Point(prev_pid_, 1), Point(prev_pid_, 3), Scalar(0, 0, 255), 2);
 			warpAffine(pid_graph_, pid_graph_, move_, pid_graph_.size());
-		}
+		}*/
 	}
 
 	void run(void) {
@@ -816,10 +818,16 @@ public:
 	}
 };
 
+void Delay(void){
+	volatile int a, b, i;
+	for(i = 0; i < 2000; i++)
+		a = b;
+}
+
 int main(int argc, char **argv) {
         ros::init(argc, argv, "pwm_control_node");
 	LaneDetector ld;
-
+	Delay();
 	while (ros::ok()){
 		ld.run();
 		ros::spinOnce();
