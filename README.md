@@ -1,6 +1,5 @@
 # pwm_control
-git clone 
-xavier_to_opencr   
+git clone https://github.com/HyeonGyu-Lee/pwm_control.git 
 
 # geometry_msgs
 git clone https://github.com/ros/common_msgs.git
