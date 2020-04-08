@@ -708,7 +708,7 @@ public:
 		size_of_segments = data.segments.size();
 		size_of_circles = data.circles.size();
 		
-		mm_vel = max_vel - min_vel;
+		mm_vel = (int)((max_vel - min_vel)*(0.1));
 
 		float dist_cir = 2.0;
 		float tem = 2.0;
