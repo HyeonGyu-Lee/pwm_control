@@ -17,6 +17,9 @@ git clone https://github.com/tysik/obstacle_detector.git
 ## laser_filters
 git clone https://github.com/ros-perception/laser_filters.git 
 
+## rplidar_plat
+git clone https://github.com/hanadul/rplidar_plat.git
+
 # Install module
 ## cv_bridge
 sudo apt-get install ros-melodic-cv-bridge   
