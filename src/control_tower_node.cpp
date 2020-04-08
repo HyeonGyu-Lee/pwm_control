@@ -11,7 +11,7 @@ using namespace cv;
 
 class LaneDetector {
 private:
-    geometry_msgs::Twist msg_;
+        geometry_msgs::Twist msg_;
 	ros::NodeHandle nh_;
 	ros::Publisher pub_;
 	ros::Subscriber image_sub_;
@@ -21,8 +21,8 @@ private:
 
 	int select_;
 	Size set_;
-	Mat frame_, resized_frame_, warped_frame_, warped_back_frame_, PID_INFO_;
-	Mat trans_, binary_frame_, sliding_frame_, histo_, result_frame_, pid_graph_;
+	Mat frame_, resized_frame_, warped_frame_, warped_back_frame_;
+	Mat binary_frame_, sliding_frame_, result_frame_;
 
 	vector<Point2f> corners_;
 	vector<Point2f> warpCorners_;
@@ -46,12 +46,10 @@ private:
 	Mat  right_coef_;
 	float left_curve_radius_;
 	float right_curve_radius_;
-
 	float center_position_;
 
 	/********** PID control ***********/
-	int steer_, accel_;
-	Mat move_;
+	int steer_, accel_, clicker_, throttle_, histo_;
 	int prev_lane_, prev_pid_;
 	float Kp_, Ki_, Kd_, dt_, result_;
 	float Kp_term_, Ki_term_, Kd_term_;
@@ -68,63 +66,44 @@ public:
 
 	void initSetup(void) {
 		cout << "LaneDetector initialization setup..." << endl;
+		
+		nh_.getParam("/Kp", Kp_);
+		nh_.getParam("/Ki", Ki_);
+		nh_.getParam("/Kd", Kd_);
+		nh_.getParam("/dt", dt_);
+		nh_.getParam("/clicker", clicker_);
+		nh_.getParam("/throttle", throttle_);
+		nh_.getParam("/histo", histo_);
 
 		/********** PID control ***********/
 		center_position_ = 640;
-		move_ = (Mat_<float>(2, 3) << 1, 0, 0, 0, 1, 3);// x y
-		Kp_ = 25;
-		Ki_ = 0.0025f;
-		Kd_ = 0.005f;
-		dt_ = 0.001f;
+		//Kp_ = 1.0f;
+		//Ki_ = 0.00001f;
+		//Kd_ = 0.005f;
+		//dt_ = 0.1f;
 		prev_err_ = 0;
-		steer_ = 1500;
-		accel_ = 1500;
+		steer_ = clicker_;
+		accel_ = throttle_;
 
 		/********** pub config **********/
 		cout << "[pub config]" << endl;
-	        pub_ = nh_.advertise<geometry_msgs::Twist>("twist_msg",10);
 	        msg_.linear.x = steer_;
 		msg_.angular.z = accel_;
+	        pub_ = nh_.advertise<geometry_msgs::Twist>("twist_msg",10);
 
 		/********** image config **********/
 		cout << "[image config]" << endl;
 		select_ = 0;
-		switch (select_) {
-		case 0:
-			image_sub_ = nh_.subscribe("/usb_cam/image_raw", 10, &LaneDetector::ImageCallback, this);
-			printf("TEST\n");
-			break;
-		case 1:
-			cap_.open("/home/jaes/Videos/test.mp4");
-			break;
-		case 2:
-			//cap_.open("C:\\testroad4.mp4");
-			cap_.open("/home/jaes/Videos/dgist_20200213.mp4");
-			break;
-		case 3:
-			//cap_.open("C:\\challenge.mp4");
-			//cap_.open("C:\\solidWhiteCurve.jpg");
-			//cap_.open("C:\\solidWhiteRight.mp4");
-			cap_.open("/home/jaes/Videos/solidYellowLeft.mp4");
-			break;
-		default:
-			break;
-		}
-
+		image_sub_ = nh_.subscribe("/usb_cam/image_raw", 10, &LaneDetector::ImageCallback, this);
+		
 		/********** set window **********/
 		cout << "[set windows]" << endl;
 		namedWindow("ORIGINAL");
 		moveWindow("ORIGINAL", 0, 0);
 		namedWindow("WARPED");
 		moveWindow("WARPED", 640, 0);
-		namedWindow("WARPED_BACK");
-		moveWindow("WARPED_BACK", 1280, 0);
-		namedWindow("HISTO");
-		moveWindow("HISTO", 0, 393);
-		namedWindow("PID_center");
-		moveWindow("PID_center", 640, 393);
 		namedWindow("RESULT");
-		moveWindow("RESULT", 1280, 393);
+		moveWindow("RESULT", 1280, 0);
 
 		/********** set thresholds **********/
 		cout << "[set thresholds]" << endl;
@@ -138,7 +117,6 @@ public:
 
 		left_coef_ = Mat::zeros(3, 1, CV_32F);
 		right_coef_ = Mat::zeros(3, 1, CV_32F);
-		pid_graph_ = Mat::zeros(Size(640, 360), CV_8UC3);
 
 		cout << "[INITIALIZATION DONE]" << endl;
 	}
@@ -155,7 +133,7 @@ public:
 	}
 
 	Mat warped_img(Mat _frame, int _width, int _height) {
-		Mat result;
+		Mat result, trans;
 		float wide_extra_upside, wide_extra_downside;
 		corners_.resize(4); // lane coord
 		warpCorners_.resize(4);
@@ -164,58 +142,26 @@ public:
 		//                    coordinate
 		//         
 		//( 0 , MAX)----------------------------------(MAX, MAX)
-		
-		switch (select_) {
-		case 1:
-			corners_[0] = Point2f(350, 250); // left up (width, height)
-			corners_[1] = Point2f(930, 250); // right up (width, height)
-			corners_[2] = Point2f(0, 500); // left down (width, height)
-			corners_[3] = Point2f(1280, 500); // right down (width, height)
-
-			wide_extra_upside = -100;
-			wide_extra_downside = 0;
-			warpCorners_[0] = Point2f(wide_extra_upside, 0.0);  // left up (width, height)
-			warpCorners_[1] = Point2f(_width - wide_extra_upside, 0.0); // right up (width, height)
-			warpCorners_[2] = Point2f(wide_extra_downside, (float)_height); // left down (width, height)
-			warpCorners_[3] = Point2f(_width - wide_extra_downside, (float)_height); // right down (width, height)
-			break;
-		case 3:
-			corners_[0] = Point2f(500, 450); // left up (width, height)
-			corners_[1] = Point2f(780, 450); // right up (width, height)
-			corners_[2] = Point2f(0, 720); // left down (width, height)
-			corners_[3] = Point2f(1280, 720); // right down (width, height)
-
-			wide_extra_upside = 0;
-			wide_extra_downside = 0;
-			warpCorners_[0] = Point2f(wide_extra_upside, 0.0);  // left up (width, height)
-			warpCorners_[1] = Point2f(_width - wide_extra_upside, 0.0); // right up (width, height)
-			warpCorners_[2] = Point2f(wide_extra_downside, (float)_height); // left down (width, height)
-			warpCorners_[3] = Point2f(_width - wide_extra_downside, (float)_height); // right down (width, height)
-			break;
-		default:
-			corners_[0] = Point2f(10, 400); // left up (width, height)
-			corners_[1] = Point2f(1270, 400); // right up (width, height)
-			corners_[2] = Point2f(10, 700); // left down (width, height)
-			corners_[3] = Point2f(1270, 700); // right down (width, height)
-
-			wide_extra_upside = -50;
-			wide_extra_downside = 150;
-			warpCorners_[0] = Point2f(wide_extra_upside, 0.0);  // left up (width, height)
-			warpCorners_[1] = Point2f(_width - wide_extra_upside, 0.0); // right up (width, height)
-			warpCorners_[2] = Point2f(wide_extra_downside, (float)_height); // left down (width, height)
-			warpCorners_[3] = Point2f(_width - wide_extra_downside, (float)_height); // right down (width, height)
-			break;
-		}
-		trans_ = getPerspectiveTransform(corners_, warpCorners_);
-		warpPerspective(_frame, result, trans_, Size(_width, _height));
+		corners_[0] = Point2f(300, 450); // left up (width, height)
+		corners_[1] = Point2f(980, 450); // right up (width, height)
+		corners_[2] = Point2f(50, 680); // left down (width, height)
+		corners_[3] = Point2f(1230, 680); // right down (width, height)
+		wide_extra_upside = 0;
+		wide_extra_downside = 100;
+		warpCorners_[0] = Point2f(wide_extra_upside, 0.0);  // left up (width, height)
+		warpCorners_[1] = Point2f(_width - wide_extra_upside, 0.0); // right up (width, height)
+		warpCorners_[2] = Point2f(wide_extra_downside, (float)_height); // left down (width, height)
+		warpCorners_[3] = Point2f(_width - wide_extra_downside, (float)_height); // right down (width, height)
+		trans = getPerspectiveTransform(corners_, warpCorners_);
+		warpPerspective(_frame, result, trans, Size(_width, _height));
 
 		return result;
 	}
 
 	Mat warped_back_img(Mat _frame, int _width, int _height) {
-		Mat result;
-		trans_ = getPerspectiveTransform(warpCorners_, corners_);
-		warpPerspective(_frame, result, trans_, Size(_width, _height));
+		Mat result, trans;
+		trans = getPerspectiveTransform(warpCorners_, corners_);
+		warpPerspective(_frame, result, trans, Size(_width, _height));
 
 		return result;
 	}
@@ -268,34 +214,10 @@ public:
 		Mat combined_frame = Mat::zeros(_frame.rows, _frame.cols, CV_8UC1);
 		for (int j = 0; j < combined_frame.rows; j++) {
 			for (int i = 0; i < combined_frame.cols; i++) {
-				if (abs_sobel_frame.at<uchar>(j, i) == 255 || l_frame.at<uchar>(j, i) == 255) combined_frame.at<uchar>(j, i) = 255;
+				if ((abs_sobel_frame.at<uchar>(j, i) > histo_) || (l_frame.at<uchar>(j, i) > histo_)) combined_frame.at<uchar>(j, i) = 255;
 			}
 		}
 		return combined_frame;
-	}
-
-	Mat HSV_thresh(Mat _frame, int width, int height) {
-		Mat HSV_Img, whiteLane, yellowLane, LinesImg;
-		cvtColor(warped_frame_, HSV_Img, COLOR_RGB2HSV);
-		Scalar whiteMinScalar = Scalar(0, 0, 0);
-		Scalar whiteMaxScalar = Scalar(255, 255, 80);
-		inRange(HSV_Img, whiteMinScalar, whiteMaxScalar, LinesImg);
-		/*
-		Scalar yellowMinScalar = Scalar(81, 119, 200);
-		Scalar yellowMaxScalar = Scalar(101, 255, 255);
-
-		inRange(HSV_Img, yellowMinScalar, yellowMaxScalar, yellowLane);
-
-		addWeighted(whiteLane, 1.0, yellowLane, 1.0, 0.0, LinesImg);
-		
-		int minCannyThreshold = 190;
-		int maxCannyThreshold = 230;
-		Canny(LinesImg, LinesImg, minCannyThreshold, maxCannyThreshold, 5, true);
-		*/
-		Mat k = getStructuringElement(MORPH_RECT, Size(25, 25)); //MATLAB :k=Ones(9)
-		morphologyEx(LinesImg, _frame, MORPH_CLOSE, k);
-
-		return _frame;
 	}
 
 	int arrMaxIdx(int hist[], int start, int end, int Max) {
@@ -421,18 +343,12 @@ public:
 			}
 		}
 
-		/********** HISTOGRAM GRAPH**********/
 		hist_Max = arrMaxIdx(hist, 0, _width, _width);
-		histo_ = Mat(_height, _width, CV_8UC3, Scalar(0, 0, 0));
-		for (int i = 0; i < _width; i++) {
-			int y_pos = (int)((hist[i] / (float)hist[hist_Max]) * _height);
-			line(histo_, Point(i, _height - y_pos), Point(i, _height), Scalar(255, 255, 255), 1);
-		}
 
 		if (last_Llane_base_ != 0 || last_Rlane_base_ != 0) {
 
-			int distrib_width = 200;
-			double sigma = distrib_width / 12.0;
+			int distrib_width = 100;
+			double sigma = distrib_width / 12.8;
 
 			int leftx_start = last_Llane_base_ - distrib_width / 2;
 			int leftx_end = last_Llane_base_ + distrib_width / 2;
@@ -453,8 +369,8 @@ public:
 		}
 		cvtColor(frame, result, COLOR_GRAY2BGR);
 
-		int mid_point = _width / 2;
-		int quarter_point = mid_point / 2;
+		int mid_point = _width / 2; // 320
+		int quarter_point = mid_point / 2; // 160
 		int n_windows = 9;
 		int margin = 100;
 		int min_pix = 200;
@@ -463,18 +379,14 @@ public:
 		int window_height = _height / n_windows;
 		
 		int offset = 0;
-		int range = 70;
-		int Lstart = quarter_point - offset;
-		int Rstart = mid_point + quarter_point + offset;
-		//int Llane_base = arrMaxIdx(hist, Lstart - range, Lstart + range, _width);
-		//int Rlane_base = arrMaxIdx(hist, Rstart - range, Rstart + range, _width);
-		int Llane_base = arrMaxIdx(hist, 0, mid_point, _width);
-		int Rlane_base = arrMaxIdx(hist, mid_point, _width, _width);
-
-
-		line(histo_, Point(hist_Max, 0), Point(hist_Max, _height), Scalar(0, 200, 0), 5);
-		line(histo_, Point(Llane_base, 0), Point(Llane_base, _height), Scalar(200, 0, 0), 2);
-		line(histo_, Point(Rlane_base, 0), Point(Rlane_base, _height), Scalar(0, 0, 200), 2);
+		int range = 120;
+		int Lstart = quarter_point - offset; // 160 - 0
+		int Rstart = mid_point + quarter_point + offset; // 480 - 0
+		// mid_point = 320, Lstart +- range = 40 ~ 280
+		int Llane_base = arrMaxIdx(hist, Lstart - range, Lstart + range, _width);
+		int Rlane_base = arrMaxIdx(hist, Rstart - range, Rstart + range, _width);
+		//int Llane_base = arrMaxIdx(hist, 10, mid_point, _width);
+		//int Rlane_base = arrMaxIdx(hist, mid_point, _width-10, _width);
 
 		int Llane_current = Llane_base;
 		int Rlane_current = Rlane_base;
@@ -566,8 +478,6 @@ public:
 			}
 		}
 
-		/// printf("%d %d\n", left_x_.at(0), right_x_.at(0));
-
 		if (left_x_.size() != 0) {
 			left_coef_ = polyfit(left_y_, left_x_);
 		}
@@ -598,7 +508,7 @@ public:
 		vector<Point> right_points;
 
 		if ((!left_coef.empty()) && (!right_coef.empty())) {
-			for (int i = 0; i < _height; i++) {
+			for (int i = 0; i <= _height; i++) {
 				Point temp_left_point;
 				Point temp_right_point;
 				temp_left_point.x = (int)((left_coef.at<float>(2, 0) * pow(i, 2)) + (left_coef.at<float>(1, 0) * i) + left_coef.at<float>(0, 0));
@@ -622,7 +532,7 @@ public:
 			perspectiveTransform(left_point_f, warped_left_point, Minv);
 			perspectiveTransform(right_point_f, warped_right_point, Minv);
 
-			for (int i = 0; i < _height; i++) {
+			for (int i = 0; i <= _height; i++) {
 				Point temp_left_point;
 				Point temp_right_point;
 
@@ -697,7 +607,6 @@ public:
 			lane_center_position = (l_fit.at<float>(0, 0) + r_fit.at<float>(0, 0)) / 2;
 			if ((lane_center_position > 0) && (lane_center_position < (float)_width)) {
 				center_position = (car_position - lane_center_position) * ym_per_pix;
-				//center_position_ = center_position;
 				err_ = (float)(lane_center_position - center_position_);
 				I_err_ += err_ * dt_;
 				D_err_ = (err_ - prev_err_) / dt_;
@@ -706,38 +615,13 @@ public:
 				result_ = (Kp_ * err_) + (Ki_ * I_err_) + (Kd_ * D_err_); // PID
 				line(sliding_frame_, Point(lane_center_position, 0), Point(lane_center_position, _height), Scalar(0, 255, 0), 5);
 
-				center_position_ += (result_*0.018);
-				//int tmp = (int)(center_position_ / 2);
-				//int tmp_lane = lane_center_position / 2;
-				//line(pid_graph_, Point(tmp_lane, 1), Point(prev_lane_, 3), Scalar(0, 255, 0), 2);
-				//line(pid_graph_, Point(tmp, 1), Point(prev_pid_, 3), Scalar(0, 0, 255), 2);
+				center_position_ += (result_);
+				steer_ = (int)(((center_position_- 640.0) / 640.0 * 400.0) + clicker_);// 1200~1800
 
-				//prev_lane_ = tmp_lane;
-				//prev_pid_ = tmp;
-				//warpAffine(pid_graph_, pid_graph_, move_, pid_graph_.size());
-
-				steer_ = (int)(((center_position_- 640.0) / 640.0 * 350.0) + 1550.0);// 1200~1800
-				if(steer_ < 1000)
-					steer_ = 1000;
-				if(steer_ > 2000)
-					steer_ = 2000;
-				accel_ = (int)(1600);
-				//printf("%5d %5d\n", steer_, accel_);
 				msg_.angular.z = (int)steer_;
 				msg_.linear.x = (int)accel_;
 			}
 		}
-			/*else {
-				line(pid_graph_, Point(prev_lane_, 1), Point(prev_lane_, 3), Scalar(0, 255, 0), 2);
-				line(pid_graph_, Point(prev_pid_, 1), Point(prev_pid_, 3), Scalar(0, 0, 255), 2);
-				warpAffine(pid_graph_, pid_graph_, move_, pid_graph_.size());
-			}
-		}
-		else {
-			line(pid_graph_, Point(prev_lane_, 1), Point(prev_lane_, 3), Scalar(0, 255, 0), 2);
-			line(pid_graph_, Point(prev_pid_, 1), Point(prev_pid_, 3), Scalar(0, 0, 255), 2);
-			warpAffine(pid_graph_, pid_graph_, move_, pid_graph_.size());
-		}*/
 	}
 
 	void run(void) {
@@ -751,82 +635,54 @@ public:
 			int height = resized_frame_.rows;
 
 		/********** Processing frame **********/
-		warped_frame_ = warped_img(resized_frame_, width, height);
-		
-		switch (select_) {
-		case 0:
-			//binary_frame_ = HSV_thresh(warped_frame_, width, height);
+			warped_frame_ = warped_img(resized_frame_, width, height);
 			binary_frame_ = pipeline_img(warped_frame_);
-			break;
-		default:
-			binary_frame_ = pipeline_img(warped_frame_);
-			break;
-		}
-		   
-		sliding_frame_ = detect_lines_sliding_window(binary_frame_, width, height);
-		resized_frame_ = draw_lane(resized_frame_, width, height, left_coef_, right_coef_, getPerspectiveTransform(warpCorners_, corners_));
-		warped_back_frame_ = warped_back_img(sliding_frame_, width, height);
-		calc_curv_rad_and_center_dist(width, height, left_coef_, right_coef_, left_x_, left_y_, right_x_, right_y_);
-		clear_release();
+			sliding_frame_ = detect_lines_sliding_window(binary_frame_, width, height);
+			resized_frame_ = draw_lane(resized_frame_, width, height, left_coef_, right_coef_, getPerspectiveTransform(warpCorners_, corners_));
+			calc_curv_rad_and_center_dist(width, height, left_coef_, right_coef_, left_x_, left_y_, right_x_, right_y_);
+			clear_release();
 		
 		/********** ROI LINE **********/
-		string Text = "ROI";
-		Point2f Text_pos(corners_[0]);
-		putText(resized_frame_, Text, Text_pos, FONT_HERSHEY_DUPLEX, 2, Scalar(0, 0, 255), 5, 8);
-		line(resized_frame_, corners_[0], corners_[2], Scalar(0, 0, 255), 5);
-		line(resized_frame_, corners_[2], corners_[3], Scalar(0, 0, 255), 5);
-		line(resized_frame_, corners_[3], corners_[1], Scalar(0, 0, 255), 5);
-		line(resized_frame_, corners_[1], corners_[0], Scalar(0, 0, 255), 5);
+			string Text = "ROI";
+			Point2f Text_pos(corners_[0]);
+			putText(resized_frame_, Text, Text_pos, FONT_HERSHEY_DUPLEX, 2, Scalar(0, 0, 255), 5, 8);
+			line(resized_frame_, corners_[0], corners_[2], Scalar(0, 0, 255), 5);
+			line(resized_frame_, corners_[2], corners_[3], Scalar(0, 0, 255), 5);
+			line(resized_frame_, corners_[3], corners_[1], Scalar(0, 0, 255), 5);
+			line(resized_frame_, corners_[1], corners_[0], Scalar(0, 0, 255), 5);
 
 		/********** PID TAG **********/
-		pid_graph_.copyTo(PID_INFO_);
-		Text = "STEER";
-		putText(PID_INFO_, Text, Point2f(300, 300), FONT_HERSHEY_DUPLEX, 1, Scalar(255, 255, 255), 2);
-		Text = to_string((int)steer_);
-		putText(PID_INFO_, Text, Point2f(400, 300), FONT_HERSHEY_DUPLEX, 1, Scalar(255, 255, 255), 2);
-		Text = "ACCEL";
-		putText(PID_INFO_, Text, Point2f(300, 340), FONT_HERSHEY_DUPLEX, 1, Scalar(255, 255, 255), 2);
-		Text = to_string((int)accel_);
-		putText(PID_INFO_, Text, Point2f(400, 340), FONT_HERSHEY_DUPLEX, 1, Scalar(255, 255, 255), 2);
+			Text = "STEER";
+			putText(sliding_frame_, Text, Point2f(300, 300), FONT_HERSHEY_DUPLEX, 1, Scalar(255, 255, 255), 2);
+			Text = to_string((int)steer_);
+			putText(sliding_frame_, Text, Point2f(400, 300), FONT_HERSHEY_DUPLEX, 1, Scalar(255, 255, 255), 2);
+			Text = "ACCEL";
+			putText(sliding_frame_, Text, Point2f(300, 340), FONT_HERSHEY_DUPLEX, 1, Scalar(255, 255, 255), 2);
+			Text = to_string((int)accel_);
+			putText(sliding_frame_, Text, Point2f(400, 340), FONT_HERSHEY_DUPLEX, 1, Scalar(255, 255, 255), 2);
 
 		/********** resized_frame_Remark **********/
-		set_ = Size(1280 / 2, 720 / 2);
+			set_ = Size(1280 / 2, 720 / 2);
 
 		/********** update_image **********/
-		resize(resized_frame_, resized_frame_, set_);
-		imshow("ORIGINAL", resized_frame_);
-		resize(sliding_frame_, sliding_frame_, set_);
-		imshow("WARPED", sliding_frame_);
-		resize(warped_back_frame_, warped_back_frame_, set_);
-		imshow("WARPED_BACK", warped_back_frame_);
-		resize(histo_, histo_, set_);
-		imshow("HISTO", histo_);
-		imshow("PID_center", PID_INFO_);
-		resize(result_frame_, result_frame_, set_);
-		imshow("RESULT", result_frame_);
+			resize(resized_frame_, resized_frame_, set_);
+			imshow("ORIGINAL", resized_frame_);
+			resize(sliding_frame_, sliding_frame_, set_);
+			imshow("WARPED", sliding_frame_);
+			resize(result_frame_, result_frame_, set_);
+			imshow("RESULT", result_frame_);
 		
 		}
 		/********** msg_publish **********/
 		
 		pub_.publish(msg_);
-		//ROS_INFO("Throttle = %f - Steer = %f\n", \
-			    msg_.linear.x, \
-			    msg_.angular.z);
-
 		waitKey(1);
 	}
 };
 
-void Delay(void){
-	volatile int a, b, i;
-	for(i = 0; i < 2000; i++)
-		a = b;
-}
-
 int main(int argc, char **argv) {
         ros::init(argc, argv, "pwm_control_node");
 	LaneDetector ld;
-	Delay();
 	while (ros::ok()){
 		ld.run();
 		ros::spinOnce();

@@ -52,6 +52,11 @@ target_link_libraries(lane_detect_node ${catkin_LIBRARIES})
 target_link_libraries(lane_detect_node ${OpenCV_LIBRARIES})
 add_dependencies(lane_detect_node pwm_control_generate_messages_cpp)
 
+add_executable(control_tower_node src/control_tower_node.cpp)
+target_link_libraries(control_tower_node ${catkin_LIBRARIES})
+target_link_libraries(control_tower_node ${OpenCV_LIBRARIES})
+add_dependencies(control_tower_node pwm_control_generate_messages_cpp)
+
 #message("catkin_LIBRARIES", ${catkin_LIBRARIES})
 message("OpenCV_LIBRARIES", ${OpenCV_LIBRARIES})
 

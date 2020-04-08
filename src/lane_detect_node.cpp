@@ -73,7 +73,7 @@ public:
 		center_position_ = 640;
 		Kp_ = 1.0f;
 		Ki_ = 0.00001f;
-		Kd_ = 0.026f;
+		Kd_ = 0.005f;
 		dt_ = 0.1f;
 		prev_err_ = 0;
 		steer_ = 1600;
@@ -616,12 +616,12 @@ public:
 				line(sliding_frame_, Point(lane_center_position, 0), Point(lane_center_position, _height), Scalar(0, 255, 0), 5);
 
 				center_position_ += (result_);
-				steer_ = (int)(((center_position_- 640.0) / 640.0 * 400.0) + 1635.0);// 1200~1800
+				steer_ = (int)(((center_position_- 640.0) / 640.0 * 400.0) + 1615.0);// 1200~1800
 				if(steer_ < 1200)
 					steer_ = 1200;
 				if(steer_ > 1800)
 					steer_ = 1800;
-				accel_ = (int)(1750);
+				accel_ = (int)(1765);
 				//printf("%5d %5d\n", steer_, accel_);
 				msg_.angular.z = (int)steer_;
 				msg_.linear.x = (int)accel_;

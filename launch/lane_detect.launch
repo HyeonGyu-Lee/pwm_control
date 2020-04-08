@@ -1,8 +1,11 @@
 <launch>
-  <arg name="path" default="/home/jaes/catkin_ws/src/pwm_control/script/ros_serial.sh" />
-  <node name="usb_cam" pkg="usb_cam" type="usb_cam_node"  />
+  <node name="usb_cam" pkg="usb_cam" type="usb_cam_node" output="screen"/>
   <node name="pwm_control" pkg="pwm_control" type="lane_detect_node">
-    <param name="cmd" value="$(arg path)" />
+    <param name="center_cliker" value="1635" />
+    <param name="Kp_val" value="1.0" />
+    <param name="Ki_val" value="0.00001" />
+    <param name="Kd_val" value="0.0025" />
+    <param name="dt_val" value="0.1" />
   </node>
   <node name="rosserial" pkg="rosserial_python" type="serial_node.py" args="_port:=/dev/ttyACM0" />
 </launch>
