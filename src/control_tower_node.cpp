@@ -22,12 +22,14 @@ private:
 	cv_bridge::CvImagePtr cv_ptr_;
 	VideoCapture cap_;
 
+	int size_of_circles;
 	int size_of_segments;
 	float dist_ob;
 
 	geometry_msgs::Point first_point;
 	geometry_msgs::Point last_point;
 	geometry_msgs::Point middle_point;
+	geometry_msgs::Point circle_point;
 
 	int select_;
 	Size set_;
@@ -696,7 +698,18 @@ public:
 		first_point.y = 0.0;
 		last_point.x = 0.0;
 		last_point.y = 0.0;
-		size_of_segment = data.segments.size();
+		size_of_segments = data.segments.size();
+		size_of_circles = data.circles.size();
+
+		float dist_cir = 2.0;
+		float tem = 2.0;
+
+		for(int i = 0; i<size_of_circles ; i++)
+		{
+			tem = sqrt( pow(data.circles[i].center.x,2)+pow(data.circles[i].center.y, 2) );
+			if( tem <= dist_cir ) dist_cir = tem;
+		}
+		
 
 		for(int i = 0; i < size_of_segments ; i++){
 			first_point.x += data.segments[i].first_point.x;
@@ -717,8 +730,9 @@ public:
 		middle_point.y = -(first_point.y + last_point.y)/2;
 
 		dist_ob = sqrt(pow(middle_point.x, 2) + pow(middle_point.y, 2));
-
-		accel_ = 1700 + (int)(dist_ob/0.14)*7;
+		
+		if(dist_ob <= dist_cir) accel_ = 1700 + (int)(dist_ob/0.14)*7;
+		else if(dist_cir < dist_ob) accel_ = 1700 + (int)(dist_cir/0.14)*7;
 
 	}
 };

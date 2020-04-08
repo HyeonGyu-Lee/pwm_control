@@ -143,7 +143,7 @@ public:
 		first_point.y = 0.0;
 		last_point.x = 0.0;
 		last_point.y = 0.0;
-		size_of_segment = data.segments.size();
+		size_of_segments = data.segments.size();
 
 		for(int i = 0; i < size_of_segments ; i++){
 			first_point.x += data.segments[i].first_point.x;
