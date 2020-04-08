@@ -22,12 +22,14 @@ private:
 	cv_bridge::CvImagePtr cv_ptr_;
 	VideoCapture cap_;
 
+	int size_of_circles;
 	int size_of_segments;
 	float dist_ob;
 
 	geometry_msgs::Point first_point;
 	geometry_msgs::Point last_point;
 	geometry_msgs::Point middle_point;
+	geometry_msgs::Point circle_point;
 
 	int select_;
 	Size set_;
@@ -143,41 +145,6 @@ public:
 		frame_ = cv_ptr_->image;
 	}
 
-<<<<<<< HEAD
-	void Obstacle_cb(const obstacle_detector::Obstacles& data)
-	{
-		first_point.x = 0.0;
-		first_point.y = 0.0;
-		last_point.x = 0.0;
-		last_point.y = 0.0;
-		size_of_segments = data.segments.size();
-
-		for(int i = 0; i < size_of_segments ; i++){
-			first_point.x += data.segments[i].first_point.x;
-			first_point.y += data.segments[i].first_point.y;
-			last_point.x += data.segments[i].last_point.x;
-			last_point.y += data.segments[i].last_point.y;
-
-		}
-
-		if(size_of_segments != 0){
-			first_point.x = first_point.x/size_of_segments;
-			first_point.y = first_point.y/size_of_segments;
-			last_point.x = last_point.x/size_of_segments;
-			last_point.y = last_point.y/size_of_segments;
-		}
-
-		middle_point.x = -(first_point.x + last_point.x)/2;
-		middle_point.y = -(first_point.y + last_point.y)/2;
-
-		dist_ob = sqrt(pow(middle_point.x, 2) + pow(middle_point.y, 2));
-
-		accel_ = 1700 + (int)(dist_ob/0.14)*7;
-
-	}
-
-=======
->>>>>>> a141bc69bd8d8ab2870d4495a6b389f0bdf7f207
 	Mat warped_img(Mat _frame, int _width, int _height) {
 		Mat result, trans;
 		float wide_extra_upside, wide_extra_downside;
@@ -429,10 +396,10 @@ public:
 		int Lstart = quarter_point - offset; // 160 - 0
 		int Rstart = mid_point + quarter_point + offset; // 480 - 0
 		// mid_point = 320, Lstart +- range = 40 ~ 280
-		int Llane_base = arrMaxIdx(hist, Lstart - range, Lstart + range, _width);
-		int Rlane_base = arrMaxIdx(hist, Rstart - range, Rstart + range, _width);
-		//int Llane_base = arrMaxIdx(hist, 10, mid_point, _width);
-		//int Rlane_base = arrMaxIdx(hist, mid_point, _width-10, _width);
+		//int Llane_base = arrMaxIdx(hist, Lstart - range, Lstart + range, _width);
+		//int Rlane_base = arrMaxIdx(hist, Rstart - range, Rstart + range, _width);
+		int Llane_base = arrMaxIdx(hist, 10, mid_point, _width);
+		int Rlane_base = arrMaxIdx(hist, mid_point, _width-10, _width);
 
 		int Llane_current = Llane_base;
 		int Rlane_current = Rlane_base;
@@ -735,6 +702,16 @@ public:
 		last_point.x = 0.0;
 		last_point.y = 0.0;
 		size_of_segments = data.segments.size();
+		size_of_circles = data.circles.size();
+
+		float dist_cir = 2.0;
+		float tem = 2.0;
+
+		for(int i = 0; i<size_of_circles ; i++)
+		{
+			tem = sqrt( pow(data.circles[i].center.x,2)+pow(data.circles[i].center.y, 2) );
+			if( tem <= dist_cir ) dist_cir = tem;
+		}
 
 		for(int i = 0; i < size_of_segments ; i++){
 			first_point.x += data.segments[i].first_point.x;
@@ -755,8 +732,9 @@ public:
 		middle_point.y = -(first_point.y + last_point.y)/2;
 
 		dist_ob = sqrt(pow(middle_point.x, 2) + pow(middle_point.y, 2));
-
-		accel_ = 1700 + (int)(dist_ob/0.14)*7;
+		
+		if(dist_ob <= dist_cir) accel_ = 1700 + (int)(dist_ob/0.14)*7;
+		else if(dist_cir < dist_ob) accel_ = 1700 + (int)(dist_cir/0.14)*7;
 
 	}
 };
