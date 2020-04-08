@@ -22,16 +22,18 @@ private:
 	cv_bridge::CvImagePtr cv_ptr_;
 	VideoCapture cap_;
 
+	/********** Lidar data ***********/
 	int size_of_circles;
 	int size_of_segments;
 	float dist_ob;
-	int base_vel, max_vel, min_vel, mm_vel;
+	int base_vel_, max_vel_, min_vel_, mm_vel_;
 
 	geometry_msgs::Point first_point;
 	geometry_msgs::Point last_point;
 	geometry_msgs::Point middle_point;
 	geometry_msgs::Point circle_point;
 
+	/********** Lane_detect data ***********/
 	int select_;
 	Size set_;
 	Mat frame_, resized_frame_, warped_frame_, warped_back_frame_;
@@ -87,7 +89,12 @@ public:
 		nh_.getParam("/clicker", clicker_);
 		nh_.getParam("/throttle", throttle_);
 		nh_.getParam("/histo", histo_);
-
+		nh_.getParam("/base_speed", base_vel_);
+		nh_.getParam("/min_speed", min_vel_);
+		nh_.getParam("/max_speed", max_vel_);
+		
+		mm_vel_ = (int)((max_vel_ - min_vel_)*(0.1));
+		
 		/********** PID control ***********/
 		center_position_ = 640;
 		//Kp_ = 1.0f;
@@ -707,8 +714,6 @@ public:
 		last_point.y = 0.0;
 		size_of_segments = data.segments.size();
 		size_of_circles = data.circles.size();
-		
-		mm_vel = (int)((max_vel - min_vel)*(0.1));
 
 		float dist_cir = 2.0;
 		float tem = 2.0;
@@ -741,14 +746,14 @@ public:
 		
 		if(size_of_segments && size_of_circles)
 		{	
-			if(dist_ob <= dist_cir) accel_ = min_vel + (int)(dist_ob/0.14)*mm_vel;
-			else if(dist_cir < dist_ob) accel_ = min_vel + (int)(dist_cir/0.14)*mm_vel;
+			if(dist_ob <= dist_cir) accel_ = min_vel_ + (int)(dist_ob/0.14)*mm_vel_;
+			else if(dist_cir < dist_ob) accel_ = min_vel_ + (int)(dist_cir/0.14)*mm_vel_;
 		}
 		else if( (!size_of_segments) && size_of_circles)
-			accel_ = (min_vel) +(int)(dist_cir/0.14)*(mm_vel);
+			accel_ = (min_vel_) +(int)(dist_cir/0.14)*(mm_vel_);
 		else if( size_of_segments && (!size_of_circles) )
-			accel_ = (min_vel) + (int)(dist_ob/0.14)*(mm_vel);
-		else accel_ = (base_vel);
+			accel_ = (min_vel_) + (int)(dist_ob/0.14)*(mm_vel_);
+		else accel_ = (base_vel_);
 	}
 };
 
