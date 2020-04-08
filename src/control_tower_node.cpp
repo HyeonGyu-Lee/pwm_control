@@ -25,6 +25,7 @@ private:
 	int size_of_circles;
 	int size_of_segments;
 	float dist_ob;
+	int base_vel, max_vel, min_vel, mm_vel;
 
 	geometry_msgs::Point first_point;
 	geometry_msgs::Point last_point;
@@ -96,6 +97,9 @@ public:
 		prev_err_ = 0;
 		steer_ = clicker_;
 		accel_ = throttle_;
+
+		/******************/
+		
 
 		/********** pub config **********/
 		cout << "[pub config]" << endl;
@@ -703,6 +707,8 @@ public:
 		last_point.y = 0.0;
 		size_of_segments = data.segments.size();
 		size_of_circles = data.circles.size();
+		
+		mm_vel = max_vel - min_vel;
 
 		float dist_cir = 2.0;
 		float tem = 2.0;
@@ -735,14 +741,14 @@ public:
 		
 		if(size_of_segments && size_of_circles)
 		{	
-			if(dist_ob <= dist_cir) accel_ = 1700 + (int)(dist_ob/0.14)*7;
-			else if(dist_cir < dist_ob) accel_ = 1700 + (int)(dist_cir/0.14)*7;
+			if(dist_ob <= dist_cir) accel_ = min_vel + (int)(dist_ob/0.14)*mm_vel;
+			else if(dist_cir < dist_ob) accel_ = min_vel + (int)(dist_cir/0.14)*mm_vel;
 		}
 		else if( (!size_of_segments) && size_of_circles)
-			accel_ = 1700 +(int)(dist_cir/0.14)*7;
+			accel_ = (min_vel) +(int)(dist_cir/0.14)*(mm_vel);
 		else if( size_of_segments && (!size_of_circles) )
-			accel_ = 1700 + (int)(dist_ob/0.14)*7;
-		else accel_ = 1735;
+			accel_ = (min_vel) + (int)(dist_ob/0.14)*(mm_vel);
+		else accel_ = (base_vel);
 	}
 };
 
