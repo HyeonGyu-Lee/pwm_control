@@ -733,9 +733,16 @@ public:
 
 		dist_ob = sqrt(pow(middle_point.x, 2) + pow(middle_point.y, 2));
 		
-		if(dist_ob <= dist_cir) accel_ = 1700 + (int)(dist_ob/0.14)*7;
-		else if(dist_cir < dist_ob) accel_ = 1700 + (int)(dist_cir/0.14)*7;
-
+		if(size_of_segments && size_of_circles)
+		{	
+			if(dist_ob <= dist_cir) accel_ = 1700 + (int)(dist_ob/0.14)*7;
+			else if(dist_cir < dist_ob) accel_ = 1700 + (int)(dist_cir/0.14)*7;
+		}
+		else if( (!size_of_segments) && size_of_circles)
+			accel_ = 1700 +(int)(dist_cir/0.14)*7;
+		else if( size_of_segments && (!size_of_circles) )
+			accel_ = 1700 + (int)(dist_ob/0.14)*7;
+		else accel_ = 1735;
 	}
 };
 
