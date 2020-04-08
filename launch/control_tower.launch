@@ -1,5 +1,6 @@
 <launch>
   <rosparam command="load" file="$(find pwm_control)/params/gains.yaml" />
+  <include file="$(find rplidar_plat)/launch/rplidar_plat.launch" />
   <node name="usb_cam" pkg="usb_cam" type="usb_cam_node" output="screen"/>
   <node name="pwm_control" pkg="pwm_control" type="control_tower_node" output="screen" />
   <node name="rosserial" pkg="rosserial_python" type="serial_node.py" args="_port:=/dev/ttyACM0" />
