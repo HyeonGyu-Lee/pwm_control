@@ -1,5 +1,6 @@
 <launch>
   <node name="usb_cam" pkg="usb_cam" type="usb_cam_node" output="screen"/>
+  <include file="$(find rplidar_plat)/launch/rplidar_plat.launch" />
   <node name="pwm_control" pkg="pwm_control" type="lane_detect_node">
     <param name="center_cliker" value="1635" />
     <param name="Kp_val" value="1.0" />

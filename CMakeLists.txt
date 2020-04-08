@@ -14,6 +14,8 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   sensor_msgs
   image_transport
+  geometry_msgs
+  obstacle_detector
 )
 
 find_package(OpenCV REQUIRED)
@@ -34,7 +36,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
   LIBRARIES pwm_control
-  CATKIN_DEPENDS roscpp rospy std_msgs 
+  CATKIN_DEPENDS roscpp rospy std_msgs geometry_msgs obstacle_detector
 )
 
 include_directories(
