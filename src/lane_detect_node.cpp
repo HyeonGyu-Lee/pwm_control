@@ -5,15 +5,15 @@
 #include "std_msgs/String.h"
 #include <iostream>
 #include <geometry_msgs/Twist.h>
-#include <geometry_msgs/Point.h>
 #include <obstacle_detector/Obstacles.h>
+#include <geometry_msgs/Point.h>
 
 using namespace std;
 using namespace cv;
 
 class LaneDetector {
 private:
-    geometry_msgs::Twist msg_;
+        geometry_msgs::Twist msg_;
 	ros::NodeHandle nh_;
 	ros::Publisher pub_;
 	ros::Subscriber image_sub_;
@@ -32,8 +32,7 @@ private:
 	int select_;
 	Size set_;
 	Mat frame_, resized_frame_, warped_frame_, warped_back_frame_;
-	Mat trans_, binary_frame_, sliding_frame_, result_frame_;
-	//Mat histo_;
+	Mat binary_frame_, sliding_frame_, result_frame_;
 
 	vector<Point2f> corners_;
 	vector<Point2f> warpCorners_;
@@ -57,11 +56,10 @@ private:
 	Mat  right_coef_;
 	float left_curve_radius_;
 	float right_curve_radius_;
-
 	float center_position_;
 
 	/********** PID control ***********/
-	int steer_, accel_;
+	int steer_, accel_, clicker_, throttle_, histo_;
 	int prev_lane_, prev_pid_;
 	float Kp_, Ki_, Kd_, dt_, result_;
 	float Kp_term_, Ki_term_, Kd_term_;
@@ -78,16 +76,24 @@ public:
 
 	void initSetup(void) {
 		cout << "LaneDetector initialization setup..." << endl;
+		
+		nh_.getParam("/Kp", Kp_);
+		nh_.getParam("/Ki", Ki_);
+		nh_.getParam("/Kd", Kd_);
+		nh_.getParam("/dt", dt_);
+		nh_.getParam("/clicker", clicker_);
+		nh_.getParam("/throttle", throttle_);
+		nh_.getParam("/histo", histo_);
 
 		/********** PID control ***********/
 		center_position_ = 640;
-		Kp_ = 1.0f;
-		Ki_ = 0.00001f;
-		Kd_ = 0.005f;
-		dt_ = 0.1f;
+		//Kp_ = 1.0f;
+		//Ki_ = 0.00001f;
+		//Kd_ = 0.005f;
+		//dt_ = 0.1f;
 		prev_err_ = 0;
-		steer_ = 1600;
-		accel_ = 1600;
+		steer_ = clicker_;
+		accel_ = throttle_;
 
 		/********** pub config **********/
 		cout << "[pub config]" << endl;
@@ -137,6 +143,7 @@ public:
 		frame_ = cv_ptr_->image;
 	}
 
+<<<<<<< HEAD
 	void Obstacle_cb(const obstacle_detector::Obstacles& data)
 	{
 		first_point.x = 0.0;
@@ -169,8 +176,10 @@ public:
 
 	}
 
+=======
+>>>>>>> a141bc69bd8d8ab2870d4495a6b389f0bdf7f207
 	Mat warped_img(Mat _frame, int _width, int _height) {
-		Mat result;
+		Mat result, trans;
 		float wide_extra_upside, wide_extra_downside;
 		corners_.resize(4); // lane coord
 		warpCorners_.resize(4);
@@ -179,12 +188,6 @@ public:
 		//                    coordinate
 		//         
 		//( 0 , MAX)----------------------------------(MAX, MAX)
-		//80
-		//corners_[0] = Point2f(10, 300); // left up (width, height)
-		//corners_[1] = Point2f(1270, 300); // right up (width, height)
-		//corners_[2] = Point2f(10, 700); // left down (width, height)
-		//corners_[3] = Point2f(1270, 700); // right down (width, height)
-		//150
 		corners_[0] = Point2f(300, 450); // left up (width, height)
 		corners_[1] = Point2f(980, 450); // right up (width, height)
 		corners_[2] = Point2f(50, 680); // left down (width, height)
@@ -195,16 +198,16 @@ public:
 		warpCorners_[1] = Point2f(_width - wide_extra_upside, 0.0); // right up (width, height)
 		warpCorners_[2] = Point2f(wide_extra_downside, (float)_height); // left down (width, height)
 		warpCorners_[3] = Point2f(_width - wide_extra_downside, (float)_height); // right down (width, height)
-		trans_ = getPerspectiveTransform(corners_, warpCorners_);
-		warpPerspective(_frame, result, trans_, Size(_width, _height));
+		trans = getPerspectiveTransform(corners_, warpCorners_);
+		warpPerspective(_frame, result, trans, Size(_width, _height));
 
 		return result;
 	}
 
 	Mat warped_back_img(Mat _frame, int _width, int _height) {
-		Mat result;
-		trans_ = getPerspectiveTransform(warpCorners_, corners_);
-		warpPerspective(_frame, result, trans_, Size(_width, _height));
+		Mat result, trans;
+		trans = getPerspectiveTransform(warpCorners_, corners_);
+		warpPerspective(_frame, result, trans, Size(_width, _height));
 
 		return result;
 	}
@@ -257,7 +260,7 @@ public:
 		Mat combined_frame = Mat::zeros(_frame.rows, _frame.cols, CV_8UC1);
 		for (int j = 0; j < combined_frame.rows; j++) {
 			for (int i = 0; i < combined_frame.cols; i++) {
-				if ((abs_sobel_frame.at<uchar>(j, i) > 200) || (l_frame.at<uchar>(j, i) > 200)) combined_frame.at<uchar>(j, i) = 255;
+				if ((abs_sobel_frame.at<uchar>(j, i) > histo_) || (l_frame.at<uchar>(j, i) > histo_)) combined_frame.at<uchar>(j, i) = 255;
 			}
 		}
 		return combined_frame;
@@ -412,8 +415,8 @@ public:
 		}
 		cvtColor(frame, result, COLOR_GRAY2BGR);
 
-		int mid_point = _width / 2;
-		int quarter_point = mid_point / 2;
+		int mid_point = _width / 2; // 320
+		int quarter_point = mid_point / 2; // 160
 		int n_windows = 9;
 		int margin = 100;
 		int min_pix = 200;
@@ -422,13 +425,14 @@ public:
 		int window_height = _height / n_windows;
 		
 		int offset = 0;
-		int range = 70;
-		int Lstart = quarter_point - offset;
-		int Rstart = mid_point + quarter_point + offset;
-		//int Llane_base = arrMaxIdx(hist, Lstart - range, Lstart + range, _width);
-		//int Rlane_base = arrMaxIdx(hist, Rstart - range, Rstart + range, _width);
-		int Llane_base = arrMaxIdx(hist, 10, mid_point, _width);
-		int Rlane_base = arrMaxIdx(hist, mid_point, _width-10, _width);
+		int range = 120;
+		int Lstart = quarter_point - offset; // 160 - 0
+		int Rstart = mid_point + quarter_point + offset; // 480 - 0
+		// mid_point = 320, Lstart +- range = 40 ~ 280
+		int Llane_base = arrMaxIdx(hist, Lstart - range, Lstart + range, _width);
+		int Rlane_base = arrMaxIdx(hist, Rstart - range, Rstart + range, _width);
+		//int Llane_base = arrMaxIdx(hist, 10, mid_point, _width);
+		//int Rlane_base = arrMaxIdx(hist, mid_point, _width-10, _width);
 
 		int Llane_current = Llane_base;
 		int Rlane_current = Rlane_base;
@@ -649,7 +653,6 @@ public:
 			lane_center_position = (l_fit.at<float>(0, 0) + r_fit.at<float>(0, 0)) / 2;
 			if ((lane_center_position > 0) && (lane_center_position < (float)_width)) {
 				center_position = (car_position - lane_center_position) * ym_per_pix;
-				//center_position_ = center_position;
 				err_ = (float)(lane_center_position - center_position_);
 				I_err_ += err_ * dt_;
 				D_err_ = (err_ - prev_err_) / dt_;
@@ -659,13 +662,11 @@ public:
 				line(sliding_frame_, Point(lane_center_position, 0), Point(lane_center_position, _height), Scalar(0, 255, 0), 5);
 
 				center_position_ += (result_);
-				steer_ = (int)(((center_position_- 640.0) / 640.0 * 400.0) + 1615.0);// 1200~1800
-				if(steer_ < 1200)
-					steer_ = 1200;
+				steer_ = (int)(((center_position_- 640.0) / 640.0 * 400.0) + clicker_);// 1200~1800
 				if(steer_ > 1800)
 					steer_ = 1800;
-				//accel_ = (int)(1765);
-				//printf("%5d %5d\n", steer_, accel_);
+				else if(steer_ < 1200)
+					steer_ = 1200;
 				msg_.angular.z = (int)steer_;
 				msg_.linear.x = (int)accel_;
 			}
@@ -724,24 +725,45 @@ public:
 		/********** msg_publish **********/
 		
 		pub_.publish(msg_);
-		//ROS_INFO("Throttle = %f - Steer = %f\n", \
-			    msg_.linear.x, \
-			    msg_.angular.z);
-
 		waitKey(1);
 	}
-};
 
-void Delay(void){
-	volatile int a, b, i;
-	for(i = 0; i < 2000; i++)
-		a = b;
-}
+	void Obstacle_cb(const obstacle_detector::Obstacles& data)
+	{
+		first_point.x = 0.0;
+		first_point.y = 0.0;
+		last_point.x = 0.0;
+		last_point.y = 0.0;
+		size_of_segments = data.segments.size();
+
+		for(int i = 0; i < size_of_segments ; i++){
+			first_point.x += data.segments[i].first_point.x;
+			first_point.y += data.segments[i].first_point.y;
+			last_point.x += data.segments[i].last_point.x;
+			last_point.y += data.segments[i].last_point.y;
+
+		}
+
+		if(size_of_segments != 0){
+			first_point.x = first_point.x/size_of_segments;
+			first_point.y = first_point.y/size_of_segments;
+			last_point.x = last_point.x/size_of_segments;
+			last_point.y = last_point.y/size_of_segments;
+		}
+
+		middle_point.x = -(first_point.x + last_point.x)/2;
+		middle_point.y = -(first_point.y + last_point.y)/2;
+
+		dist_ob = sqrt(pow(middle_point.x, 2) + pow(middle_point.y, 2));
+
+		accel_ = 1700 + (int)(dist_ob/0.14)*7;
+
+	}
+};
 
 int main(int argc, char **argv) {
         ros::init(argc, argv, "pwm_control_node");
 	LaneDetector ld;
-	Delay();
 	while (ros::ok()){
 		ld.run();
 		ros::spinOnce();
@@ -749,3 +771,5 @@ int main(int argc, char **argv) {
 
 	return 0;
 }
+
+

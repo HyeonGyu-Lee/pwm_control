@@ -396,10 +396,10 @@ public:
 		int Lstart = quarter_point - offset; // 160 - 0
 		int Rstart = mid_point + quarter_point + offset; // 480 - 0
 		// mid_point = 320, Lstart +- range = 40 ~ 280
-		int Llane_base = arrMaxIdx(hist, Lstart - range, Lstart + range, _width);
-		int Rlane_base = arrMaxIdx(hist, Rstart - range, Rstart + range, _width);
-		//int Llane_base = arrMaxIdx(hist, 10, mid_point, _width);
-		//int Rlane_base = arrMaxIdx(hist, mid_point, _width-10, _width);
+		//int Llane_base = arrMaxIdx(hist, Lstart - range, Lstart + range, _width);
+		//int Rlane_base = arrMaxIdx(hist, Rstart - range, Rstart + range, _width);
+		int Llane_base = arrMaxIdx(hist, 10, mid_point, _width);
+		int Rlane_base = arrMaxIdx(hist, mid_point, _width-10, _width);
 
 		int Llane_current = Llane_base;
 		int Rlane_current = Rlane_base;
@@ -630,7 +630,10 @@ public:
 
 				center_position_ += (result_);
 				steer_ = (int)(((center_position_- 640.0) / 640.0 * 400.0) + clicker_);// 1200~1800
-
+				if(steer_ > 1800)
+					steer_ = 1800;
+				else if(steer_ < 1200)
+					steer_ = 1200;
 				msg_.angular.z = (int)steer_;
 				msg_.linear.x = (int)accel_;
 			}
@@ -699,6 +702,7 @@ public:
 		last_point.x = 0.0;
 		last_point.y = 0.0;
 		size_of_segments = data.segments.size();
+<<<<<<< HEAD
 		size_of_circles = data.circles.size();
 
 		float dist_cir = 2.0;
@@ -710,6 +714,8 @@ public:
 			if( tem <= dist_cir ) dist_cir = tem;
 		}
 		
+=======
+>>>>>>> a141bc69bd8d8ab2870d4495a6b389f0bdf7f207
 
 		for(int i = 0; i < size_of_segments ; i++){
 			first_point.x += data.segments[i].first_point.x;
