@@ -5,6 +5,8 @@
 #include "std_msgs/String.h"
 #include <iostream>
 #include <geometry_msgs/Twist.h>
+#include <obstacle_detector/Obstacles.h>
+#include <geometry_msgs/Point.h>
 
 using namespace std;
 using namespace cv;
@@ -15,9 +17,17 @@ private:
 	ros::NodeHandle nh_;
 	ros::Publisher pub_;
 	ros::Subscriber image_sub_;
+	ros::Subscriber obstacle_sub_;
 
 	cv_bridge::CvImagePtr cv_ptr_;
 	VideoCapture cap_;
+
+	int size_of_segments;
+	float dist_ob;
+
+	geometry_msgs::Point first_point;
+	geometry_msgs::Point last_point;
+	geometry_msgs::Point middle_point;
 
 	int select_;
 	Size set_;
@@ -95,7 +105,8 @@ public:
 		cout << "[image config]" << endl;
 		select_ = 0;
 		image_sub_ = nh_.subscribe("/usb_cam/image_raw", 10, &LaneDetector::ImageCallback, this);
-		
+		obstacle_sub_ = nh_.subscribe("/raw_obstacles", 100, &LaneDetector::Obstacle_cb, this);
+
 		/********** set window **********/
 		cout << "[set windows]" << endl;
 		namedWindow("ORIGINAL");
@@ -678,6 +689,38 @@ public:
 		pub_.publish(msg_);
 		waitKey(1);
 	}
+
+	void Obstacle_cb(const obstacle_detector::Obstacles& data)
+	{
+		first_point.x = 0.0;
+		first_point.y = 0.0;
+		last_point.x = 0.0;
+		last_point.y = 0.0;
+		size_of_segment = data.segments.size();
+
+		for(int i = 0; i < size_of_segments ; i++){
+			first_point.x += data.segments[i].first_point.x;
+			first_point.y += data.segments[i].first_point.y;
+			last_point.x += data.segments[i].last_point.x;
+			last_point.y += data.segments[i].last_point.y;
+
+		}
+
+		if(size_of_segments != 0){
+			first_point.x = first_point.x/size_of_segments;
+			first_point.y = first_point.y/size_of_segments;
+			last_point.x = last_point.x/size_of_segments;
+			last_point.y = last_point.y/size_of_segments;
+		}
+
+		middle_point.x = -(first_point.x + last_point.x)/2;
+		middle_point.y = -(first_point.y + last_point.y)/2;
+
+		dist_ob = sqrt(pow(middle_point.x, 2) + pow(middle_point.y, 2));
+
+		accel_ = 1700 + (int)(dist_ob/0.14)*7;
+
+	}
 };
 
 int main(int argc, char **argv) {
@@ -690,3 +733,5 @@ int main(int argc, char **argv) {
 
 	return 0;
 }
+
+
