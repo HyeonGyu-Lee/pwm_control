@@ -37,7 +37,7 @@ private:
 	int select_;
 	Size set_;
 	Mat frame_, resized_frame_, warped_frame_, warped_back_frame_;
-	Mat binary_frame_, sliding_frame_, result_frame_;
+	Mat binary_frame_, sliding_frame_;
 
 	vector<Point2f> corners_;
 	vector<Point2f> warpCorners_;
@@ -122,8 +122,6 @@ public:
 		moveWindow("ORIGINAL", 0, 0);
 		namedWindow("WARPED");
 		moveWindow("WARPED", 640, 0);
-		namedWindow("RESULT");
-		moveWindow("RESULT", 1280, 0);
 
 		/********** set thresholds **********/
 		cout << "[set thresholds]" << endl;
@@ -570,8 +568,8 @@ public:
 			const Point *right_points_point = (const cv::Point*) Mat(right_points).data;
 			int right_points_number = Mat(right_points).rows;
 
-			polylines(result_frame_, &left_points_point, &left_points_number, 1, false, Scalar(255, 100, 100), 10);
-			polylines(result_frame_, &right_points_point, &right_points_number, 1, false, Scalar(100, 100, 255), 10);
+			polylines(resized_frame_, &left_points_point, &left_points_number, 1, false, Scalar(255, 100, 100), 10);
+			polylines(resized_frame_, &right_points_point, &right_points_number, 1, false, Scalar(100, 100, 255), 10);
 
 			left_point.clear();
 			right_point.clear();
@@ -652,7 +650,6 @@ public:
 			cap_ >> frame_;
 		if(!frame_.empty()){
 			resize(frame_, resized_frame_, Size(1280, 720));
-			resized_frame_.copyTo(result_frame_);
 
 			int width = resized_frame_.cols;
 			int height = resized_frame_.rows;
@@ -691,10 +688,7 @@ public:
 			resize(resized_frame_, resized_frame_, set_);
 			imshow("ORIGINAL", resized_frame_);
 			resize(sliding_frame_, sliding_frame_, set_);
-			imshow("WARPED", sliding_frame_);
-			resize(result_frame_, result_frame_, set_);
-			imshow("RESULT", result_frame_);
-		
+			imshow("WARPED", sliding_frame_);	
 		}
 		/********** msg_publish **********/
 		
