@@ -66,9 +66,9 @@ private:
 	/********** PID control ***********/
 	int steer_, accel_, clicker_, throttle_, histo_;
 	int prev_lane_, prev_pid_;
-	float Kp_, Ki_, Kd_, dt_, result_;
-	float Kp_term_, Ki_term_, Kd_term_;
-	float err_, prev_err_, I_err_, D_err_;
+	double Kp_, Ki_, Kd_, dt_, result_;
+	double Kp_term_, Ki_term_, Kd_term_;
+	double err_, prev_err_, I_err_, D_err_;
 public:
 	LaneDetector(void) {
 		initSetup();
@@ -97,10 +97,6 @@ public:
 		
 		/********** PID control ***********/
 		center_position_ = 640;
-		//Kp_ = 1.0f;
-		//Ki_ = 0.00001f;
-		//Kd_ = 0.005f;
-		//dt_ = 0.1f;
 		prev_err_ = 0;
 		steer_ = clicker_;
 		accel_ = throttle_;
@@ -631,7 +627,7 @@ public:
 			lane_center_position = (l_fit.at<float>(0, 0) + r_fit.at<float>(0, 0)) / 2;
 			if ((lane_center_position > 0) && (lane_center_position < (float)_width)) {
 				center_position = (car_position - lane_center_position) * ym_per_pix;
-				err_ = (float)(lane_center_position - center_position_);
+				err_ = (double)(lane_center_position - center_position_);
 				I_err_ += err_ * dt_;
 				D_err_ = (err_ - prev_err_) / dt_;
 				prev_err_ = err_;
@@ -640,7 +636,7 @@ public:
 				line(sliding_frame_, Point(lane_center_position, 0), Point(lane_center_position, _height), Scalar(0, 255, 0), 5);
 
 				center_position_ += (result_);
-				steer_ = (int)(((center_position_- 640.0) / 640.0 * 400.0) + clicker_);// 1200~1800
+				steer_ = (int)(((center_position_- 640.0) / 640.0 * 500.0) + clicker_);// 1200~1800
 				if(steer_ > 1800)
 					steer_ = 1800;
 				else if(steer_ < 1200)

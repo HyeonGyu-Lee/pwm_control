@@ -1,10 +1,10 @@
 Kp: 1.0
 Ki: 0.00001
-Kd: 0.005
+Kd: 0.0025
 dt: 0.1
 clicker: 1615
-throttle: 1765
+throttle: 1500
 histo: 200
-base_speed: 1600
+base_speed: 1550
 min_speed: 1500
-max_speed: 1700
+max_speed: 1600
