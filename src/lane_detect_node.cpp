@@ -5,8 +5,6 @@
 #include "std_msgs/String.h"
 #include <iostream>
 #include <geometry_msgs/Twist.h>
-#include <obstacle_detector/Obstacles.h>
-#include <geometry_msgs/Point.h>
 
 using namespace std;
 using namespace cv;
@@ -22,19 +20,10 @@ private:
 	cv_bridge::CvImagePtr cv_ptr_;
 	VideoCapture cap_;
 
-	int size_of_circles;
-	int size_of_segments;
-	float dist_ob;
-
-	geometry_msgs::Point first_point;
-	geometry_msgs::Point last_point;
-	geometry_msgs::Point middle_point;
-	geometry_msgs::Point circle_point;
-
-	int select_;
+	/********** Lane_detect data ***********/
 	Size set_;
 	Mat frame_, resized_frame_, warped_frame_, warped_back_frame_;
-	Mat binary_frame_, sliding_frame_, result_frame_;
+	Mat binary_frame_, sliding_frame_;
 
 	vector<Point2f> corners_;
 	vector<Point2f> warpCorners_;
@@ -63,9 +52,9 @@ private:
 	/********** PID control ***********/
 	int steer_, accel_, clicker_, throttle_, histo_;
 	int prev_lane_, prev_pid_;
-	float Kp_, Ki_, Kd_, dt_, result_;
-	float Kp_term_, Ki_term_, Kd_term_;
-	float err_, prev_err_, I_err_, D_err_;
+	double Kp_, Ki_, Kd_, dt_, result_;
+	double Kp_term_, Ki_term_, Kd_term_;
+	double err_, prev_err_, I_err_, D_err_;
 public:
 	LaneDetector(void) {
 		initSetup();
@@ -83,19 +72,18 @@ public:
 		nh_.getParam("/Ki", Ki_);
 		nh_.getParam("/Kd", Kd_);
 		nh_.getParam("/dt", dt_);
-		nh_.getParam("/clicker", clicker_);
+		nh_.getParam("/clicker_2", clicker_);
 		nh_.getParam("/throttle", throttle_);
 		nh_.getParam("/histo", histo_);
-
+		
 		/********** PID control ***********/
 		center_position_ = 640;
-		//Kp_ = 1.0f;
-		//Ki_ = 0.00001f;
-		//Kd_ = 0.005f;
-		//dt_ = 0.1f;
 		prev_err_ = 0;
 		steer_ = clicker_;
 		accel_ = throttle_;
+
+		/******************/
+		
 
 		/********** pub config **********/
 		cout << "[pub config]" << endl;
@@ -105,18 +93,14 @@ public:
 
 		/********** image config **********/
 		cout << "[image config]" << endl;
-		select_ = 0;
 		image_sub_ = nh_.subscribe("/usb_cam/image_raw", 10, &LaneDetector::ImageCallback, this);
-		obstacle_sub_ = nh_.subscribe("/raw_obstacles", 100, &LaneDetector::Obstacle_cb, this);
 
 		/********** set window **********/
 		cout << "[set windows]" << endl;
-		namedWindow("ORIGINAL");
-		moveWindow("ORIGINAL", 0, 0);
-		namedWindow("WARPED");
-		moveWindow("WARPED", 640, 0);
-		namedWindow("RESULT");
-		moveWindow("RESULT", 1280, 0);
+		//namedWindow("ORIGINAL");
+		//moveWindow("ORIGINAL", 0, 0);
+		//namedWindow("WARPED");
+		//moveWindow("WARPED", 640, 0);
 
 		/********** set thresholds **********/
 		cout << "[set thresholds]" << endl;
@@ -563,8 +547,8 @@ public:
 			const Point *right_points_point = (const cv::Point*) Mat(right_points).data;
 			int right_points_number = Mat(right_points).rows;
 
-			polylines(result_frame_, &left_points_point, &left_points_number, 1, false, Scalar(255, 100, 100), 10);
-			polylines(result_frame_, &right_points_point, &right_points_number, 1, false, Scalar(100, 100, 255), 10);
+			polylines(resized_frame_, &left_points_point, &left_points_number, 1, false, Scalar(255, 100, 100), 10);
+			polylines(resized_frame_, &right_points_point, &right_points_number, 1, false, Scalar(100, 100, 255), 10);
 
 			left_point.clear();
 			right_point.clear();
@@ -620,7 +604,7 @@ public:
 			lane_center_position = (l_fit.at<float>(0, 0) + r_fit.at<float>(0, 0)) / 2;
 			if ((lane_center_position > 0) && (lane_center_position < (float)_width)) {
 				center_position = (car_position - lane_center_position) * ym_per_pix;
-				err_ = (float)(lane_center_position - center_position_);
+				err_ = (double)(lane_center_position - center_position_);
 				I_err_ += err_ * dt_;
 				D_err_ = (err_ - prev_err_) / dt_;
 				prev_err_ = err_;
@@ -629,7 +613,7 @@ public:
 				line(sliding_frame_, Point(lane_center_position, 0), Point(lane_center_position, _height), Scalar(0, 255, 0), 5);
 
 				center_position_ += (result_);
-				steer_ = (int)(((center_position_- 640.0) / 640.0 * 400.0) + clicker_);// 1200~1800
+				steer_ = (int)(((center_position_- 640.0) / 640.0 * 500.0) + clicker_);// 1200~1800
 				if(steer_ > 1800)
 					steer_ = 1800;
 				else if(steer_ < 1200)
@@ -641,11 +625,9 @@ public:
 	}
 
 	void run(void) {
-		if(select_ != 0)
-			cap_ >> frame_;
+		cap_ >> frame_;
 		if(!frame_.empty()){
 			resize(frame_, resized_frame_, Size(1280, 720));
-			resized_frame_.copyTo(result_frame_);
 
 			int width = resized_frame_.cols;
 			int height = resized_frame_.rows;
@@ -681,61 +663,15 @@ public:
 			set_ = Size(1280 / 2, 720 / 2);
 
 		/********** update_image **********/
-			resize(resized_frame_, resized_frame_, set_);
-			imshow("ORIGINAL", resized_frame_);
-			resize(sliding_frame_, sliding_frame_, set_);
-			imshow("WARPED", sliding_frame_);
-			resize(result_frame_, result_frame_, set_);
-			imshow("RESULT", result_frame_);
-		
+			//resize(resized_frame_, resized_frame_, set_);
+			//imshow("ORIGINAL", resized_frame_);
+			//resize(sliding_frame_, sliding_frame_, set_);
+			//imshow("WARPED", sliding_frame_);	
 		}
 		/********** msg_publish **********/
 		
 		pub_.publish(msg_);
 		waitKey(1);
-	}
-
-	void Obstacle_cb(const obstacle_detector::Obstacles& data)
-	{
-		first_point.x = 0.0;
-		first_point.y = 0.0;
-		last_point.x = 0.0;
-		last_point.y = 0.0;
-		size_of_segments = data.segments.size();
-		size_of_circles = data.circles.size();
-
-		float dist_cir = 2.0;
-		float tem = 2.0;
-
-		for(int i = 0; i<size_of_circles ; i++)
-		{
-			tem = sqrt( pow(data.circles[i].center.x,2)+pow(data.circles[i].center.y, 2) );
-			if( tem <= dist_cir ) dist_cir = tem;
-		}
-
-		for(int i = 0; i < size_of_segments ; i++){
-			first_point.x += data.segments[i].first_point.x;
-			first_point.y += data.segments[i].first_point.y;
-			last_point.x += data.segments[i].last_point.x;
-			last_point.y += data.segments[i].last_point.y;
-
-		}
-
-		if(size_of_segments != 0){
-			first_point.x = first_point.x/size_of_segments;
-			first_point.y = first_point.y/size_of_segments;
-			last_point.x = last_point.x/size_of_segments;
-			last_point.y = last_point.y/size_of_segments;
-		}
-
-		middle_point.x = -(first_point.x + last_point.x)/2;
-		middle_point.y = -(first_point.y + last_point.y)/2;
-
-		dist_ob = sqrt(pow(middle_point.x, 2) + pow(middle_point.y, 2));
-		
-		if(dist_ob <= dist_cir) accel_ = 1700 + (int)(dist_ob/0.14)*7;
-		else if(dist_cir < dist_ob) accel_ = 1700 + (int)(dist_cir/0.14)*7;
-
 	}
 };
 
@@ -743,8 +679,8 @@ int main(int argc, char **argv) {
         ros::init(argc, argv, "pwm_control_node");
 	LaneDetector ld;
 	while (ros::ok()){
-		ld.run();
 		ros::spinOnce();
+		ld.run();
 	}
 
 	return 0;
